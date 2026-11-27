@@ -767,6 +767,23 @@
         </div>
         <div class="max-w-6xl mx-auto">
 
+          <!-- Automatic live performance board. The timing window is internal logic only. -->
+          <section id="dna-live-board" class="mb-8 rounded-2xl border border-fuchsia-500/50 bg-gradient-to-br from-[#101020] via-[#090b16] to-[#07131b] p-4 sm:p-6 shadow-[0_0_30px_rgba(168,85,247,.12)]">
+            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
+              <div>
+                <p class="text-xs font-extrabold tracking-[.22em] text-cyan-300 uppercase">Live event updates</p>
+                <h3 class="text-2xl sm:text-3xl font-black text-white mt-1">Next 3 Performances</h3>
+                <p class="text-xs text-gray-400 mt-1">Live countdown · Dubai time</p>
+              </div>
+              <div class="sm:text-right">
+                <div id="dna-live-clock" class="text-xl sm:text-2xl font-black text-white tabular-nums">--:--:--</div>
+                <div id="dna-live-date" class="text-xs text-gray-400 mt-1">Updating Dubai time</div>
+              </div>
+            </div>
+            <div id="dna-live-stages" class="grid grid-cols-1 md:grid-cols-3 gap-4" aria-live="polite">
+              <div class="rounded-xl border border-white/10 bg-black/25 p-4 text-gray-400">Loading stage schedules…</div>
+            </div>
+          </section>
 
 <section class="mb-7"><label for="studentSearch" class="block text-sm font-semibold text-gray-200 mb-2 text-center">Find a student or performance</label>
 <div class="relative max-w-xl mx-auto"><input id="studentSearch" type="search" placeholder="Search student name, category, time or stage…" class="w-full rounded-xl bg-[#111326] border border-gray-700 px-4 py-3 text-white placeholder-gray-500 outline-none focus:border-cyan-400"></div>
@@ -1366,6 +1383,79 @@ dnaIntro.addEventListener('keydown', (event) => {
   document.addEventListener('keydown',function(e){ if(e.key==='Escape' && popup.classList.contains('is-visible')) closePopup(); });
   cta.addEventListener('click',closePopup);
   document.addEventListener('dnaAcademyEntered',function(){ window.setTimeout(openPopup,650); },{once:true});
+})();
+</script>
+
+
+<script>
+(function(){
+  const board=document.getElementById('dna-live-board');
+  const listEl=document.getElementById('dna-live-stages');
+  if(!board||!listEl) return;
+  const SLOT_MS=11*60*1000; // Internal schedule window only; never shown to visitors.
+  const zone='Asia/Dubai';
+  const clockFmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+  const dateLabelFmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  function makeDubaiTimestamp(y,m,d,h,min){return Date.UTC(y,m-1,d,h-4,min,0,0);}
+  function readSchedule(){
+    const events=[];
+    document.querySelectorAll('#santhwanam-schedule table[aria-label]').forEach(table=>{
+      const label=table.getAttribute('aria-label')||'';
+      const day=label.includes('Day 1')?28:label.includes('Day 2')?29:null;
+      if(!day) return;
+      table.querySelectorAll('tbody tr.schedule-row').forEach(row=>{
+        const cells=row.querySelectorAll('td'); if(cells.length<5) return;
+        const name=cells[1].textContent.trim(), category=cells[2].textContent.trim();
+        const timeText=cells[3].textContent.trim();
+        const match=timeText.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if(!name||!match) return;
+        let hour=Number(match[1])%12; if(match[3].toUpperCase()==='PM') hour+=12;
+        events.push({name,category,day,start:makeDubaiTimestamp(2026,11,day,hour,Number(match[2])),timeText});
+      });
+    });
+    return events.sort((a,b)=>a.start-b.start);
+  }
+  function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function countdown(ms){
+    const total=Math.max(0,Math.floor(ms/1000));
+    const hours=Math.floor(total/3600), minutes=Math.floor((total%3600)/60), seconds=total%60;
+    return [hours,minutes,seconds].map(n=>String(n).padStart(2,'0')).join(':');
+  }
+  function eventCard(e,nowMs,isLive,index){
+    const dateLabel=e.day+' November 2026';
+    const badge=isLive
+      ? '<span class="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-[10px] font-black tracking-wider text-emerald-300"><span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>LIVE NOW</span>'
+      : '<span class="rounded-full bg-fuchsia-400/10 px-3 py-1 text-[10px] font-black tracking-wider text-fuchsia-300">UP NEXT · '+(index+1)+'</span>';
+    const timer=isLive
+      ? '<div class="text-xl sm:text-2xl font-black text-emerald-300 tabular-nums">HAPPENING NOW</div>'
+      : '<div class="text-xl sm:text-2xl font-black text-cyan-300 tabular-nums">'+countdown(e.start-nowMs)+'</div><div class="text-[10px] font-bold tracking-[.16em] text-gray-500 mt-1">TIME LEFT</div>';
+    return '<article class="rounded-xl border '+(isLive?'border-emerald-400/50 bg-emerald-400/[.07]':'border-white/10 bg-black/25')+' p-4 sm:p-5">'+
+      '<div class="flex flex-wrap items-center justify-between gap-3 mb-3">'+badge+
+      '<span class="text-xs font-bold text-gray-300">'+esc(e.timeText)+' UAE · '+esc(dateLabel)+'</span></div>'+
+      '<div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] sm:items-center gap-3">'+
+      '<div><h4 class="text-lg sm:text-xl font-black text-white">'+esc(e.name)+'</h4><p class="text-xs text-gray-400 mt-1">'+esc(e.category)+'</p></div>'+
+      '<div class="sm:text-right">'+timer+'</div></div></article>';
+  }
+  function render(){
+    const now=new Date(), nowMs=now.getTime();
+    document.getElementById('dna-live-clock').textContent=clockFmt.format(now)+' UAE';
+    document.getElementById('dna-live-date').textContent=dateLabelFmt.format(now);
+    const events=readSchedule();
+    const live=events.filter(e=>nowMs>=e.start&&nowMs<e.start+SLOT_MS).sort((a,b)=>a.start-b.start);
+    const upcoming=events.filter(e=>e.start>nowMs).sort((a,b)=>a.start-b.start);
+    const chosen=[];
+    live.forEach(e=>{if(chosen.length<3)chosen.push({event:e,isLive:true});});
+    upcoming.forEach(e=>{if(chosen.length<3)chosen.push({event:e,isLive:false});});
+    if(chosen.length){
+      listEl.className='block';
+      listEl.innerHTML='<div class="mb-3 flex flex-wrap items-center justify-between gap-2"><h4 class="text-lg font-black text-white">Next 3 Performances</h4><span class="text-[10px] font-bold tracking-[.16em] text-gray-500">LIVE COUNTDOWN · UAE TIME</span></div>'+
+        '<div class="grid grid-cols-1 md:grid-cols-3 gap-3">'+chosen.map((item,i)=>eventCard(item.event,nowMs,item.isLive,i)).join('')+'</div>';
+    }else{
+      listEl.className='block';
+      listEl.innerHTML='<div class="rounded-xl border border-white/10 bg-black/20 p-5"><div class="text-sm font-black tracking-[.16em] text-gray-400">SCHEDULE COMPLETE</div><div class="text-sm text-gray-300 mt-1">There are no more scheduled performances.</div></div>';
+    }
+  }
+  render(); window.setInterval(render,1000);
 })();
 </script>
 
