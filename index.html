@@ -195,8 +195,16 @@
         #santhwanam-event-popup.is-visible { display:flex; }
         #santhwanam-event-popup .event-popup-card { position:relative; width:min(92vw,560px); max-height:90vh; overflow:auto; border:1px solid rgba(217,70,239,.8); border-radius:24px; background:linear-gradient(145deg,#11111d,#08080c 65%); box-shadow:0 0 55px rgba(217,70,239,.24),0 20px 70px rgba(0,0,0,.6); }
         #santhwanam-event-popup .event-popup-poster { display:block; width:100%; max-height:230px; object-fit:cover; object-position:center 35%; border-radius:15px; }
-        #santhwanam-event-popup .event-popup-cta { display:block; width:100%; padding:14px 18px; border-radius:12px; color:white; font-weight:900; text-align:center; background:linear-gradient(90deg,#9333ea,#db2777,#0891b2); }
-        @media(prefers-reduced-motion:no-preference){ #santhwanam-event-popup .event-popup-card { animation:eventPopupIn .35s ease-out both; } @keyframes eventPopupIn { from{opacity:0;transform:translateY(18px) scale(.98)} to{opacity:1;transform:translateY(0) scale(1)} } }
+        #santhwanam-event-popup .event-popup-cta { display:block; width:100%; padding:14px 18px; border-radius:12px; color:white; font-weight:900; text-align:center; background:linear-gradient(90deg,#9333ea,#db2777,#0891b2); position:relative; z-index:1; box-shadow:0 0 22px rgba(217,70,239,.16); }
+        #santhwanam-event-popup .schedule-guide { display:flex; align-items:center; justify-content:center; gap:9px; margin:20px 0 8px; color:#f0abfc; font-size:11px; line-height:1.2; font-weight:900; letter-spacing:.14em; text-align:center; text-shadow:0 0 12px rgba(217,70,239,.45); }
+        #santhwanam-event-popup .schedule-guide .schedule-pointer { display:inline-block; flex:none; font-family:system-ui,sans-serif; font-size:29px; line-height:1; filter:drop-shadow(0 0 7px rgba(244,114,182,.65)); transform-origin:50% 20%; }
+        @media(prefers-reduced-motion:no-preference){
+          #santhwanam-event-popup .event-popup-card { animation:eventPopupIn .35s ease-out both; }
+          #santhwanam-event-popup .schedule-guide .schedule-pointer { animation:schedulePoint 1.15s ease-in-out infinite; }
+          @keyframes eventPopupIn { from{opacity:0;transform:translateY(18px) scale(.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+          @keyframes schedulePoint { 0%,100%{transform:translateY(-2px)} 50%{transform:translateY(6px)} }
+        }
+        @media(prefers-reduced-motion:reduce){ #santhwanam-event-popup .schedule-guide .schedule-pointer { transform:none; } }
 </style>
 </head>
 <body class="antialiased selection:bg-purple-600 selection:text-white dna-intro-active">
@@ -1321,6 +1329,10 @@ dnaIntro.addEventListener('keydown', (event) => {
         </div>
         <p class="text-center text-white font-bold">28 &amp; 29 November 2026</p>
         <p class="text-center text-sm text-gray-300 mt-1 mb-5">Gulf Model School, Al Muhaisnah, Dubai</p>
+        <div class="schedule-guide" aria-hidden="true">
+          <span>TAP HERE TO VIEW SCHEDULE</span>
+          <span class="schedule-pointer" aria-hidden="true">👇</span>
+        </div>
         <a href="#santhwanam-schedule" id="santhwanam-popup-cta" class="event-popup-cta">VIEW PARTICIPANT SCHEDULE <span aria-hidden="true">→</span></a>
         <p class="mt-3 text-center text-xs text-gray-500">Celebrate and support our academy students!</p>
       </div>
