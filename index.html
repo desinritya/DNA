@@ -127,7 +127,17 @@
             visibility: hidden;
             pointer-events: none;
         }
-        #dna-intro canvas {
+        #dna-intro #waveCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+        #dna-intro #dnaCanvas {
+            position: relative;
+            z-index: 1;
             display: block;
             width: min(92vw, 760px);
             height: auto;
@@ -136,6 +146,7 @@
         }
         #dna-intro .intro-hint {
             position: absolute;
+            z-index: 2;
             bottom: max(28px, env(safe-area-inset-bottom));
             left: 0;
             right: 0;
@@ -191,6 +202,7 @@
 <body class="antialiased selection:bg-purple-600 selection:text-white dna-intro-active">
     <!-- Full-screen DNA intro. Click/tap anywhere to reveal the academy website. -->
     <div id="dna-intro" role="button" tabindex="0" aria-label="Enter Desi Nritya Academy website">
+        <canvas id="waveCanvas" aria-hidden="true"></canvas>
         <canvas id="dnaCanvas"></canvas>
         <div class="intro-hint">Click anywhere to enter</div>
     </div>
@@ -291,7 +303,7 @@
                         <a href="#register" class="bg-gradient-btn hover:opacity-90 text-white font-bold px-8 py-4 rounded-md uppercase tracking-wider text-sm transition shadow-lg shadow-purple-600/30">
                             Apply Now
                         </a>
-                        <button onclick="playVideoModal()" class="flex items-center space-x-3 text-white hover:text-purple-400 group transition">
+                        <button type="button" aria-disabled="true" title="Video link will be added soon" class="flex items-center space-x-3 text-white group transition">
                             <div class="w-12 h-12 rounded-full border border-gray-600 flex items-center justify-center group-hover:border-purple-500 group-hover:bg-purple-600/20 transition">
                                 <i class="fa-solid fa-play text-xs text-white ml-0.5"></i>
                             </div>
@@ -855,7 +867,7 @@
             <div class="p-8 text-center space-y-4">
                 <h3 class="text-2xl font-bold text-white">DNA Studio Showcase Reel</h3>
                 <div class="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center border border-gray-800">
-                    <iframe class="w-full h-full" src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=0" title="DNA Dance Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    <iframe class="w-full h-full" src="about:blank" title="DNA Dance Video" frameborder="0"></iframe>
                 </div>
             </div>
         </div>
@@ -876,9 +888,8 @@
     </div>
 
 
-    <!-- DNA logo disintegration loop and intro interaction -->
+    <!-- DNA filament-wave cover and the supplied exact-colour particle dissolve / reverse-reassembly loop -->
     <script>
-
 const canvas = document.getElementById('dnaCanvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
@@ -895,15 +906,17 @@ let state = 'HOLD';
 let stateStartTime = 0;
 let burnProgress = 0;
 let maxTrigger = 0;
+let burnFrame = 0;
+let totalBurnFrames = 0;
+let reverseStates = [];
 
-const HOLD_DURATION = 1200;     // ms to show solid logo before burning
-const REAPPEAR_DURATION = 900;  // ms to smoothly fade logo back in
+const HOLD_DURATION = 2200;     // let the finished logo read clearly before the next transition
+let REAPPEAR_DURATION = 1800; // recalculated to match the exact burn frame count
 
 img.onload = () => {
-  const padding = 120;
-  const maxWidth = Math.min(520, window.innerWidth * 0.72);
-  const maxHeight = Math.min(520, window.innerHeight * 0.72);
-  const scale = Math.min(1, maxWidth / img.width, maxHeight / img.height);
+  const padding = 160;
+  const maxWidth = 520;
+  const scale = Math.min(1, maxWidth / img.width);
   
   imgW = Math.floor(img.width * scale);
   imgH = Math.floor(img.height * scale);
@@ -928,6 +941,9 @@ function initParticles() {
   particles = [];
   burnProgress = 0;
   maxTrigger = 0;
+  burnFrame = 0;
+  totalBurnFrames = 0;
+  reverseStates = [];
 
   const step = 2;
   for (let y = 0; y < imgH; y += step) {
@@ -951,6 +967,10 @@ function initParticles() {
         particles.push({
           x: imgX + x,
           y: imgY + y,
+          homeX: imgX + x,
+          homeY: imgY + y,
+          returnX: imgX + x,
+          returnY: imgY + y,
           r: r,
           g: g,
           b: b,
@@ -964,13 +984,22 @@ function initParticles() {
           vy: -(Math.random() * 1.8) - 0.35,
           life: 1.0,
           decay: Math.random() * 0.014 + 0.006,
-          size: step
+          size: step,
+          homeX: imgX + x,
+          homeY: imgY + y,
+          releaseFrame: null,
+          deathFrame: null,
+          deathX: imgX + x,
+          deathY: imgY + y,
+          deathLife: 0
         });
       }
     }
   }
 }
 
+
+// Stable animation: the source is a 9-frame animated GIF, extracted into individual PNG frames.
 function loop(now) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -982,10 +1011,11 @@ function loop(now) {
       initParticles();
       state = 'BURN';
     }
-  } 
+  }
   else if (state === 'BURN') {
     ctx.globalAlpha = 1.0;
     burnProgress += 5.5;
+    burnFrame++;
     let activeParticles = 0;
 
     for (let i = 0; i < particles.length; i++) {
@@ -994,10 +1024,10 @@ function loop(now) {
       if (!p.burned) {
         if (burnProgress >= p.trigger) {
           p.burned = true;
+          p.releaseFrame = burnFrame;
         } else {
           const distToBurn = p.trigger - burnProgress;
           if (distToBurn < 20) {
-            // Glowing color-matched edge right before breaking apart
             const intensity = 1 - (distToBurn / 20);
             const edgeR = Math.round(p.r + (p.glowR - p.r) * intensity);
             const edgeG = Math.round(p.g + (p.glowG - p.g) * intensity);
@@ -1012,36 +1042,83 @@ function loop(now) {
       }
 
       if (p.burned && p.life > 0) {
+        // Keep the exact original forward movement formula.
         p.x += p.vx + (Math.sin(p.y * 0.05) * 0.5);
         p.y += p.vy;
         p.life -= p.decay;
 
         if (p.life > 0) {
-          // Drifting particles retain the exact gradient colors of their letter section
-          // Starts bright/glowing as it detaches, then fades out in its native hue
-          const boost = p.life > 0.75 ? 1.25 : 0.95;
+          const boost = p.life > 0.75 ? 1.12 : 0.95;
           const outR = Math.min(255, Math.round(p.r * boost));
           const outG = Math.min(255, Math.round(p.g * boost));
           const outB = Math.min(255, Math.round(p.b * boost));
           ctx.fillStyle = `rgba(${outR}, ${outG}, ${outB}, ${p.life * p.a})`;
           ctx.fillRect(p.x, p.y, p.size, p.size);
           activeParticles++;
+        } else {
+          // Save the exact endpoint reached by this particle as it vanished.
+          p.deathFrame = burnFrame;
+          p.deathX = p.x;
+          p.deathY = p.y;
+          p.deathLife = p.life;
         }
       }
     }
 
     if (activeParticles === 0) {
+      totalBurnFrames = burnFrame;
+      // Match the burn's frame duration, so the reverse feels like a true rewind.
+      REAPPEAR_DURATION = Math.max(900, totalBurnFrames * (1000 / 60));
+      reverseStates = particles.map(p => ({
+        x: p.deathX,
+        y: p.deathY,
+        life: p.deathLife,
+        lastFrame: p.deathFrame
+      }));
       state = 'REAPPEAR';
       stateStartTime = now;
     }
-  } 
+  }
   else if (state === 'REAPPEAR') {
     const elapsed = now - stateStartTime;
     const progress = Math.min(1, elapsed / REAPPEAR_DURATION);
-    const eased = 1 - Math.pow(1 - progress, 3);
+    const reverseFrame = Math.max(0, totalBurnFrames - Math.floor(progress * totalBurnFrames));
 
-    ctx.globalAlpha = eased;
-    ctx.drawImage(img, imgX, imgY, imgW, imgH);
+    // Rewind the original burn timeline frame by frame. Late-disappearing
+    // particles return first; early-disappearing particles return last.
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      const rs = reverseStates[i];
+
+      if (p.releaseFrame === null || p.deathFrame === null) continue;
+      if (reverseFrame > p.deathFrame) continue;
+
+      // Undo the exact same per-frame movement formula used during BURN.
+      while (rs.lastFrame > reverseFrame && rs.lastFrame >= p.releaseFrame) {
+        const previousY = rs.y - p.vy;
+        rs.x -= p.vx + (Math.sin(previousY * 0.05) * 0.5);
+        rs.y = previousY;
+        rs.life += p.decay;
+        rs.lastFrame--;
+      }
+
+      if (reverseFrame < p.releaseFrame) {
+        // Before its original release moment, the pixel is back at its exact
+        // original logo location and full opacity.
+        ctx.globalAlpha = p.a;
+        ctx.fillStyle = `rgb(${p.r}, ${p.g}, ${p.b})`;
+        ctx.fillRect(p.homeX, p.homeY, p.size, p.size);
+      } else {
+        // During its reverse flight, restore the same colour and inverse fade.
+        const restoredLife = Math.max(0, Math.min(1, rs.life));
+        if (restoredLife > 0.005) {
+          ctx.globalAlpha = p.a * restoredLife;
+          ctx.fillStyle = `rgb(${p.r}, ${p.g}, ${p.b})`;
+          ctx.fillRect(rs.x, rs.y, p.size, p.size);
+        }
+      }
+    }
+
     ctx.globalAlpha = 1.0;
 
     if (progress >= 1) {
@@ -1053,20 +1130,137 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-    const dnaIntro = document.getElementById('dna-intro');
-    function enterAcademy() {
-        if (!dnaIntro || dnaIntro.classList.contains('is-opening')) return;
-        dnaIntro.classList.add('is-opening');
-        document.body.classList.remove('dna-intro-active');
-        window.setTimeout(() => { dnaIntro.remove(); document.dispatchEvent(new Event('dnaAcademyEntered')); }, 750);
+// Keep the cover interactive: click, tap, Enter or Space to reveal the website.
+const dnaIntro = document.getElementById('dna-intro');
+function enterAcademy() {
+    if (!dnaIntro || dnaIntro.classList.contains('is-opening')) return;
+    dnaIntro.classList.add('is-opening');
+    document.body.classList.remove('dna-intro-active');
+    window.setTimeout(() => { dnaIntro.remove(); document.dispatchEvent(new Event('dnaAcademyEntered')); }, 750);
+}
+dnaIntro.addEventListener('click', enterAcademy);
+dnaIntro.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        enterAcademy();
     }
-    dnaIntro.addEventListener('click', enterAcademy);
-    dnaIntro.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            enterAcademy();
-        }
-    });
+});
+    </script>
+
+    <script>
+(() => {
+  const canvas = document.getElementById('waveCanvas');
+  const ctx = canvas.getContext('2d');
+  let w = 0, h = 0, dpr = 1;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth;
+    h = window.innerHeight;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize, { passive: true });
+  resize();
+
+  const TAU = Math.PI * 2;
+  const strands = 76;
+  const crossSections = 34;
+
+  function centerLine(u, t) {
+    const envelope = Math.pow(Math.sin(Math.PI * u), 0.72);
+    const drift = Math.sin(u * TAU * 1.18 - t * 0.72) * h * 0.105;
+    const curl = Math.sin(u * TAU * 2.35 + t * 0.46) * h * 0.035;
+    return h * 0.5 + (drift + curl) * (0.28 + envelope * 0.9);
+  }
+
+  function strandPoint(u, v, t, strandIndex) {
+    const env = 0.18 + 0.82 * Math.pow(Math.sin(Math.PI * u), 0.72);
+    const twist = u * TAU * 1.42 - t * 0.78 + v * 2.1;
+    const fold = Math.sin(twist + strandIndex * 0.014) * h * 0.095;
+    const ripple = Math.sin(u * TAU * 3.1 + t * 0.53 + v * 4.0) * h * 0.025;
+    const spread = v * h * (0.12 + 0.08 * Math.sin(u * TAU * 1.1 - t * 0.38));
+    const x = u * w;
+    const y = centerLine(u, t) + (fold + ripple) * env + spread;
+    return [x, y];
+  }
+
+  function strokeFilament(points, alpha, width, bright = false) {
+    if (points.length < 2) return;
+    const grad = ctx.createLinearGradient(0, h * 0.5, w, h * 0.5);
+    // DNA logo palette: electric cyan, violet, magenta and warm amber.
+    grad.addColorStop(0, `rgba(23,179,242,${alpha * 0.48})`);
+    grad.addColorStop(0.27, `rgba(126,29,191,${alpha * 0.82})`);
+    grad.addColorStop(0.51, `rgba(${bright ? '255,190,116' : '240,30,132'},${alpha})`);
+    grad.addColorStop(0.76, `rgba(230,0,153,${alpha * 0.82})`);
+    grad.addColorStop(1, `rgba(23,179,242,${alpha * 0.42})`);
+    ctx.beginPath();
+    points.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+
+  function draw(now) {
+    const t = now * 0.00022;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#020306';
+    ctx.fillRect(0, 0, w, h);
+
+    // A restrained atmospheric glow behind the moving filament structure.
+    const glow = ctx.createRadialGradient(w * 0.5, h * 0.5, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.58);
+    glow.addColorStop(0, 'rgba(126,29,191,0.13)');
+    glow.addColorStop(0.34, 'rgba(23,179,242,0.075)');
+    glow.addColorStop(0.62, 'rgba(240,30,132,0.045)');
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+
+    // Long, fine strands fold through one another like a luminous neural mesh.
+    for (let i = 0; i < strands; i++) {
+      const v = (i / (strands - 1) - 0.5) * 2;
+      const pts = [];
+      for (let j = 0; j <= 150; j++) {
+        const u = j / 150;
+        pts.push(strandPoint(u, v, t, i));
+      }
+      const centerWeight = 1 - Math.abs(v) * 0.52;
+      const alpha = 0.085 + centerWeight * 0.19;
+      strokeFilament(pts, alpha, i % 9 === 0 ? 0.95 : 0.58, i % 13 === 0);
+    }
+
+    // Fine transverse filaments create the interwoven mesh, not a flat set of parallel lines.
+    for (let k = 0; k < crossSections; k++) {
+      const u = k / (crossSections - 1);
+      const pts = [];
+      for (let j = 0; j <= 52; j++) {
+        const v = (j / 52 - 0.5) * 2;
+        pts.push(strandPoint(u, v, t, k * 2));
+      }
+      strokeFilament(pts, 0.055 + 0.035 * Math.sin(k * 0.7 + t), 0.48, false);
+    }
+
+    // Sparse pinpoints catch the light along the moving strands.
+    for (let i = 0; i < 24; i++) {
+      const u = (i * 0.61803398875 + t * 0.035) % 1;
+      const v = Math.sin(i * 12.37) * 0.72;
+      const [x, y] = strandPoint(u, v, t, i);
+      const pulse = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 2.1 + i * 1.7));
+      ctx.beginPath();
+      ctx.arc(x, y, 0.65 + pulse * 0.55, 0, TAU);
+      const glints = ['23,179,242', '240,30,132', '126,29,191', '229,163,66'];
+      ctx.fillStyle = `rgba(${glints[i % glints.length]},${0.12 + pulse * 0.25})`;
+      ctx.fill();
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
     </script>
     <!-- Header logo remains static; the full-screen intro animation is preserved. -->
 
