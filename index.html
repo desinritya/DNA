@@ -1392,10 +1392,12 @@ dnaIntro.addEventListener('keydown', (event) => {
   const board=document.getElementById('dna-live-board');
   const listEl=document.getElementById('dna-live-stages');
   if(!board||!listEl) return;
-  const SLOT_MS=11*60*1000; // Internal schedule window only; never shown to visitors.
+  const SLOT_MS=11*60*1000; // Preserve the original live-status window.
+  const DELAY_MS=40*60*1000; // Shift countdown/live-board timing by 40 minutes only.
   const zone='Asia/Dubai';
   const clockFmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
   const dateLabelFmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const adjustedTimeFmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit',hour12:true});
   function makeDubaiTimestamp(y,m,d,h,min){return Date.UTC(y,m-1,d,h-4,min,0,0);}
   function readSchedule(){
     const events=[];
@@ -1423,6 +1425,7 @@ dnaIntro.addEventListener('keydown', (event) => {
   }
   function eventCard(e,nowMs,isLive,index){
     const dateLabel=e.day+' November 2026';
+    const adjustedTime=adjustedTimeFmt.format(new Date(e.start));
     const badge=isLive
       ? '<span class="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-[10px] font-black tracking-wider text-emerald-300"><span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>LIVE NOW</span>'
       : '<span class="rounded-full bg-fuchsia-400/10 px-3 py-1 text-[10px] font-black tracking-wider text-fuchsia-300">UP NEXT · '+(index+1)+'</span>';
@@ -1431,7 +1434,7 @@ dnaIntro.addEventListener('keydown', (event) => {
       : '<div class="text-xl sm:text-2xl font-black text-cyan-300 tabular-nums">'+countdown(e.start-nowMs)+'</div><div class="text-[10px] font-bold tracking-[.16em] text-gray-500 mt-1">TIME LEFT</div>';
     return '<article class="rounded-xl border '+(isLive?'border-emerald-400/50 bg-emerald-400/[.07]':'border-white/10 bg-black/25')+' p-4 sm:p-5">'+
       '<div class="flex flex-wrap items-center justify-between gap-3 mb-3">'+badge+
-      '<span class="text-xs font-bold text-gray-300">'+esc(e.timeText)+' UAE · '+esc(dateLabel)+'</span></div>'+
+      '<span class="text-xs font-bold text-gray-300">Expected: '+esc(adjustedTime)+' UAE · '+esc(dateLabel)+'</span></div>'+
       '<div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] sm:items-center gap-3">'+
       '<div><h4 class="text-lg sm:text-xl font-black text-white">'+esc(e.name)+'</h4><p class="text-xs text-gray-400 mt-1">'+esc(e.category)+'</p></div>'+
       '<div class="sm:text-right">'+timer+'</div></div></article>';
@@ -1440,7 +1443,10 @@ dnaIntro.addEventListener('keydown', (event) => {
     const now=new Date(), nowMs=now.getTime();
     document.getElementById('dna-live-clock').textContent=clockFmt.format(now)+' UAE';
     document.getElementById('dna-live-date').textContent=dateLabelFmt.format(now);
-    const events=readSchedule();
+    const originalEvents=readSchedule();
+    const firstScheduledStart=originalEvents.length?originalEvents[0].start:null;
+    const delayed=firstScheduledStart!==null&&nowMs>=firstScheduledStart;
+    const events=originalEvents.map(e=>({...e,start:e.start+DELAY_MS}));
     const live=events.filter(e=>nowMs>=e.start&&nowMs<e.start+SLOT_MS).sort((a,b)=>a.start-b.start);
     const upcoming=events.filter(e=>e.start>nowMs).sort((a,b)=>a.start-b.start);
     const chosen=[];
@@ -1448,7 +1454,7 @@ dnaIntro.addEventListener('keydown', (event) => {
     upcoming.forEach(e=>{if(chosen.length<3)chosen.push({event:e,isLive:false});});
     if(chosen.length){
       listEl.className='block';
-      listEl.innerHTML='<div class="mb-3 flex flex-wrap items-center justify-between gap-2"><h4 class="text-lg font-black text-white">Next 3 Performances</h4><span class="text-[10px] font-bold tracking-[.16em] text-gray-500">LIVE COUNTDOWN · UAE TIME</span></div>'+
+      listEl.innerHTML=(delayed?'<div class="mb-3 rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-xs sm:text-sm font-black tracking-wide text-red-400">COMPETITION DELAYED</div>':'')+'<div class="mb-3 flex flex-wrap items-center justify-between gap-2"><h4 class="text-lg font-black text-white">Next 3 Performances</h4><span class="text-[10px] font-bold tracking-[.16em] text-gray-500">LIVE COUNTDOWN · UAE TIME</span></div>'+
         '<div class="grid grid-cols-1 md:grid-cols-3 gap-3">'+chosen.map((item,i)=>eventCard(item.event,nowMs,item.isLive,i)).join('')+'</div>';
     }else{
       listEl.className='block';
