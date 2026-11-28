@@ -1393,7 +1393,7 @@ dnaIntro.addEventListener('keydown', (event) => {
   const listEl=document.getElementById('dna-live-stages');
   if(!board||!listEl) return;
   const SLOT_MS=11*60*1000; // Preserve the original live-status window.
-  const DELAY_MS=15*60*1000; // Shift countdown/live-board timing by 15 minutes only.
+  const DELAY_MS=40*60*1000; // Shift countdown/live-board timing by 40 minutes only.
   const zone='Asia/Dubai';
   const clockFmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
   const dateLabelFmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'long',day:'numeric',month:'long',year:'numeric'});
